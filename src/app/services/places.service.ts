@@ -8,20 +8,27 @@ export class PlacesService {
   public userLocation?: [number, number];
 
   constructor() {
+    this.initUserLocation();
+  }
+
+  private initUserLocation() {
     if (typeof window !== 'undefined' && navigator.geolocation) {
       this.getUserLocation();
     } else {
-      console.error('Geolocation is not supported by your environment');
+      console.error('Problema con la geolocalizacion en el entorno');
+      this.userLocation = undefined;
     }
   }
 
-  public getUserLocation() {
+  private getUserLocation() {
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => {
         this.userLocation = [coords.latitude, coords.longitude];
+        document.dispatchEvent(new Event('userLocationReady'));
       },
       (error) => {
         console.error('Error getting location:', error);
+        this.userLocation = undefined;
       }
     );
   }
