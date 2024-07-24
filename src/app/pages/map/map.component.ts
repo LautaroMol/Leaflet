@@ -1,5 +1,7 @@
 import { Component, OnInit, AfterViewInit } from '@angular/core';
 import { PlacesService } from '../../services/places.service';
+import { marker, tileLayer } from 'leaflet';
+import { json } from 'stream/consumers';
 
 @Component({
   selector: 'app-map',
@@ -23,15 +25,28 @@ export class MapComponent implements OnInit, AfterViewInit {
   Locate() {
     if (this.map && this.geo) {
       import('leaflet').then(({ marker }) => {
-        marker(this.geo).addTo(this.map).bindPopup("<strong>Usted está ubicado aquí</strong>").openPopup();
+        this.ubi = localStorage.getItem('geoLoc');
+        const miUbi = marker(JSON.parse(this.ubi)).addTo(this.map).bindPopup("<b>Esta es su ubicacion</b>").openPopup().openPopup();
       }).catch(err => console.error('Error loading Leaflet marker:', err));
     }
+    
   }
 
   ngOnInit() {
     if (typeof window !== 'undefined' && typeof document !== 'undefined') {
       document.addEventListener('userLocationReady', () => {
         this.initializeMap();
+        setTimeout(() => {
+          if (this.ubi == null){
+            this.geo = this.placeSvc.userLocation;
+            localStorage.setItem('geoLoc', JSON.stringify(this.geo));
+
+          }else{
+            localStorage.removeItem('geoLoc');
+            this.ubi = localStorage.getItem('geoLoc')
+          }
+
+        }, 2000);
       });
     }
   }
@@ -39,7 +54,13 @@ export class MapComponent implements OnInit, AfterViewInit {
   ngAfterViewInit() {
     if (typeof window !== 'undefined' && typeof document !== 'undefined') {
       if (this.placeSvc.userLocation) {
-        this.initializeMap();
+        
+        setTimeout(() => {
+          this.ubi = localStorage.getItem('geoLoc');
+          this.map.setView(JSON.parse('geoLoc'),13);
+
+          this.initializeMap();
+        }, 2000);
       }
     }
   }

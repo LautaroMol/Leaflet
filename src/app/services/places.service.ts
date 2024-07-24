@@ -15,7 +15,7 @@ export class PlacesService {
     if (typeof window !== 'undefined' && navigator.geolocation) {
       this.getUserLocation();
     } else {
-      console.error('Problema con la geolocalizacion en el entorno');
+      
       this.userLocation = undefined;
     }
   }
