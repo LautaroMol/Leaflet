@@ -3,106 +3,129 @@ import { PlacesService } from '../../services/places.service';
 
 
 @Component({
-  selector: 'app-map',
   standalone: true,
-  imports: [],
+  selector: 'app-map',
   templateUrl: './map.component.html',
   styleUrls: ['./map.component.css']
 })
 export class MapComponent implements OnInit, AfterViewInit {
   geo: any;
   map: any;
-  ubi: any;
-  counter = 0;
+  currentLocationMarker: any;
+  chosenLocationMarker: any;
+  isLocated = false;
+  routeControl: any;
 
   constructor(private placeSvc: PlacesService) {}
 
   Reload() {
-    localStorage.removeItem('geoLoc')
+    localStorage.removeItem('geoLoc');
     location.reload();
   }
-  //En la funcion locate se ejemplifican algunos metodos para usar con el marcador
+
   Locate() {
-    if (this.map && this.geo) {
-      import('leaflet').then(({ marker }) => {
-        this.ubi = localStorage.getItem('geoLoc');
-        const miUbi = marker(JSON.parse(this.ubi),{draggable:true}).addTo(this.map).bindPopup(`<b>Esta es la ubicacion: </b> ${this.counter}`).openPopup();
-        let newUbi = miUbi.setLatLng(JSON.parse(this.ubi));
+    if (this.map && this.geo && !this.isLocated) {
+      import('leaflet').then(L => {
+        this.geo = this.placeSvc.userLocation;
+        this.currentLocationMarker = L.marker(this.geo)
+          .addTo(this.map)
+          .bindPopup('<b>Esta es tu ubicación actual</b>')
+          .openPopup();
+        this.isLocated = true;
+        localStorage.setItem('geoLoc', JSON.stringify(this.geo));
 
-        console.log(newUbi);
-
-        miUbi.on('click',()=> console.log('Presione click'));
-        
-        miUbi.on('dblclick',()=> console.log('Presione doble click'));
-
-        miUbi.on('moveend',()=>{
-          let moveUbi = Object.values(newUbi);
-          let meUbi = [moveUbi[1].lat,moveUbi[1].lng];
-
-          this.ubi = meUbi;
-
-          console.log(newUbi);
-          console.log(meUbi);
-
-          localStorage.setItem('geoLoc',JSON.stringify(this.ubi));
+        this.currentLocationMarker.on('moveend', () => {
+          const latLng = this.currentLocationMarker.getLatLng();
+          this.geo = [latLng.lat, latLng.lng];
+          localStorage.setItem('geoLoc', JSON.stringify(this.geo));
         });
 
-        this.counter++;
-        this.map.flyTo([miUbi.getLatLng().lat,miUbi.getLatLng().lng]);
-
+        this.map.flyTo(this.geo, 13);
       }).catch(err => console.error('Error loading Leaflet marker:', err));
     }
-    
   }
 
-  ngOnInit(){
-    this.counter = 0;
-    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-      document.addEventListener('userLocationReady', () => {
-        this.initializeMap();
-        setTimeout(() => {
-          if (this.ubi == null){
-            this.geo = this.placeSvc.userLocation;
-            localStorage.setItem('geoLoc', JSON.stringify(this.geo));
-
-          }else{
-            localStorage.removeItem('geoLoc');
-            this.ubi = localStorage.getItem('geoLoc')
-          }
-
-        }, 2000);
-      });
+  CalculateRoute() {
+    if (this.map && this.currentLocationMarker && this.chosenLocationMarker) {
+      const start = this.currentLocationMarker.getLatLng();
+      const end = this.chosenLocationMarker.getLatLng();
+  
+      import('leaflet-routing-machine').then(() => {
+        const { latLng, Routing } = (window as any).L;
+  
+        if (this.routeControl) {
+          this.map.removeControl(this.routeControl);
+        }
+  
+        this.routeControl = Routing.control({
+          waypoints: [
+            latLng(start.lat, start.lng),
+            latLng(end.lat, end.lng)
+          ],
+          routeWhileDragging: true,
+          show: false
+        }).addTo(this.map);
+  
+        const distance = this.map.distance(start, end);
+        alert(`La distancia entre los marcadores es de ${distance.toFixed(2)} metros.`);
+      }).catch(err => console.error('Error loading Leaflet Routing Machine:', err));
     }
+  }
+  
+
+  ngOnInit() {
+    this.isLocated = false;
+    document.addEventListener('userLocationReady', () => {
+      this.initializeMap();
+      setTimeout(() => {
+        this.geo = this.placeSvc.userLocation;
+        if (this.geo) {
+          localStorage.setItem('geoLoc', JSON.stringify(this.geo));
+        }
+      }, 2000);
+    });
   }
 
   ngAfterViewInit() {
-    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-      if (this.placeSvc.userLocation) {
-        
-        setTimeout(() => {
-          this.ubi = localStorage.getItem('geoLoc');
-          this.map.setView(JSON.parse('geoLoc'),13);
-
+    if (this.placeSvc.userLocation) {
+      setTimeout(() => {
+        this.geo = this.placeSvc.userLocation;
+        if (this.geo) {
           this.initializeMap();
-        }, 2000);
-      }
+        }
+      }, 2000);
     }
   }
 
   private initializeMap() {
+    if (typeof window === 'undefined') {
+      return; // Evita ejecutar en SSR
+    }
+
     if (this.map) {
       return; // Evita reinicializar el mapa
     }
+
     this.geo = this.placeSvc.userLocation;
     if (this.geo) {
       import('leaflet').then(L => {
-        setTimeout(() => {
-          this.map = new L.Map('map').setView(this.geo, 13);
-          L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          }).addTo(this.map);
-        }, 2000);
+        this.map = L.map('map').setView(this.geo, 13);
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(this.map);
+
+        this.map.on('click', (e: L.LeafletMouseEvent) => {
+          const { lat, lng } = e.latlng;
+          if (this.chosenLocationMarker) {
+            this.chosenLocationMarker.setLatLng([lat, lng]);
+          } else {
+            this.chosenLocationMarker = L.marker([lat, lng], { draggable: true })
+              .addTo(this.map)
+              .bindPopup('<b>Ubicación elegida</b>')
+              .openPopup();
+          }
+        });
       }).catch(err => console.error('Error loading Leaflet:', err));
     }
   }
