@@ -66,11 +66,13 @@ export class MapComponent implements OnInit, AfterViewInit {
           show: false
         }).addTo(this.map);
   
-        const distance = this.map.distance(start, end);
-        alert(`La distancia entre los marcadores es de ${distance.toFixed(2)} metros.`);
+        const distanceInMeters = this.map.distance(start, end);
+        const distanceInKilometers = distanceInMeters / 1000;
+        alert(`La distancia entre los marcadores es de ${distanceInKilometers.toFixed(2)} kilómetros.`);
       }).catch(err => console.error('Error loading Leaflet Routing Machine:', err));
     }
   }
+  
   
 
   ngOnInit() {
