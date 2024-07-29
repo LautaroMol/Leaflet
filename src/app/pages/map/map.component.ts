@@ -37,6 +37,8 @@ export class MapComponent implements OnInit, AfterViewInit {
         this.currentLocationMarker.on('moveend', () => {
           const latLng = this.currentLocationMarker.getLatLng();
           this.geo = [latLng.lat, latLng.lng];
+          console.log(latLng.lat, latLng.lng);
+          console.log(latLng.lng, latLng.lat);
           localStorage.setItem('geoLoc', JSON.stringify(this.geo));
         });
 
@@ -107,7 +109,7 @@ export class MapComponent implements OnInit, AfterViewInit {
     if (this.map) {
       return; // Evita reinicializar el mapa
     }
-
+    //uso de import dinamicos para hacer SSR
     this.geo = this.placeSvc.userLocation;
     if (this.geo) {
       import('leaflet').then(L => {
@@ -116,6 +118,14 @@ export class MapComponent implements OnInit, AfterViewInit {
           maxZoom: 19,
           attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(this.map);
+        //import dinamico de control geocoder
+        import('leaflet-control-geocoder').then(() => {
+          if ((window as any).L.Control && (window as any).L.Control.Geocoder) {
+            (window as any).L.Control.geocoder().addTo(this.map);
+          } else {
+            console.error('Leaflet Control Geocoder is not available.');
+          }
+        }).catch(err => console.error('Error loading Leaflet Control Geocoder:', err));
 
         this.map.on('click', (e: L.LeafletMouseEvent) => {
           const { lat, lng } = e.latlng;
