@@ -1,7 +1,6 @@
 import { Component, OnInit, AfterViewInit } from '@angular/core';
 import { PlacesService } from '../../services/places.service';
 
-
 @Component({
   standalone: true,
   selector: 'app-map',
@@ -75,41 +74,43 @@ export class MapComponent implements OnInit, AfterViewInit {
     }
   }
   
-  
-
   ngOnInit() {
     this.isLocated = false;
-    document.addEventListener('userLocationReady', () => {
-      this.initializeMap();
-      setTimeout(() => {
-        this.geo = this.placeSvc.userLocation;
-        if (this.geo) {
-          localStorage.setItem('geoLoc', JSON.stringify(this.geo));
-        }
-      }, 2000);
-    });
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+      document.addEventListener('userLocationReady', () => {
+        this.initializeMap();
+        setTimeout(() => {
+          this.geo = this.placeSvc.userLocation;
+          if (this.geo) {
+            localStorage.setItem('geoLoc', JSON.stringify(this.geo));
+          }
+        }, 2000);
+      });
+    }
   }
 
   ngAfterViewInit() {
-    if (this.placeSvc.userLocation) {
-      setTimeout(() => {
-        this.geo = this.placeSvc.userLocation;
-        if (this.geo) {
-          this.initializeMap();
-        }
-      }, 2000);
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+      if (this.placeSvc.userLocation) {
+        setTimeout(() => {
+          this.geo = this.placeSvc.userLocation;
+          if (this.geo) {
+            this.initializeMap();
+          }
+        }, 2000);
+      }
     }
   }
 
   private initializeMap() {
-    if (typeof window === 'undefined') {
-      return; // Evita ejecutar en SSR
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      return; // Evita ejecutar en servidor y evitar errores en consola
     }
 
     if (this.map) {
       return; // Evita reinicializar el mapa
     }
-    //uso de import dinamicos para hacer SSR
+    //uso de imports dinamicos
     this.geo = this.placeSvc.userLocation;
     if (this.geo) {
       import('leaflet').then(L => {
@@ -118,10 +119,21 @@ export class MapComponent implements OnInit, AfterViewInit {
           maxZoom: 19,
           attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         }).addTo(this.map);
-        //import dinamico de control geocoder
+        
         import('leaflet-control-geocoder').then(() => {
           if ((window as any).L.Control && (window as any).L.Control.Geocoder) {
-            (window as any).L.Control.geocoder().addTo(this.map);
+            (window as any).L.Control.geocoder({defaultMarkGeocode: false})
+            .on('markgeocode', (e: { geocode: { bbox: any; }; }) => {
+              var bbox = e.geocode.bbox;
+              var poly = L.polygon([
+                bbox.getSouthEast(),
+                bbox.getNorthEast(),
+                bbox.getNorthWest(),
+                bbox.getSouthWest()
+              ]).addTo(this.map);
+              this.map.fitBounds(poly.getBounds());
+            })
+            .addTo(this.map);
           } else {
             console.error('Leaflet Control Geocoder is not available.');
           }
